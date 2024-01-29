@@ -113,7 +113,10 @@ The purpose of the 'Resume logging' node is to enhance TeslaMate's accuracy in l
 
 ### Test the flow
 
+Plug in your car and schedule a charge to start in the future. I.e. the car should not be charging when the flow is tested.
+
 Click on the blue button on the left side of the trigger node
    * If the car is not plugged in at home, in charge stopped state, the 'Calculate charge start based on Nordpool prices' node will show 'Not plugged in at home...' status
-   * If the car is ready to be scheduled, the node should first show 'Fetching Nordpool prices', and then the scheduled charge start time
+   * If the car is ready to be scheduled, the node should first show 'Fetching Nordpool prices' status, and then the scheduled charge start time as status
+   * Open the Tesla app, or check the charge schedule from the car. The car should be scheduled to charge at the time calculated by the automation
 

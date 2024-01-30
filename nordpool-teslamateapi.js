@@ -28,12 +28,8 @@ try {
         return null
     }
 
-    // Charge speed:
-    // * ~9% per hour, a bit slower in cold weather
-    // * ~8.3% per hour at -10°C
-    // * ~7.6% per hour at -20°C
-    const percentPerHour = chargePercentagePointsPerHour + 0.7 * (outside_temp < 0 ? outside_temp : 0)
-    const chargeHours = Math.ceil((charge_limit_soc - battery_level) / percentPerHour)
+    const percentPointsPerHour = chargePercentagePointsPerHour + chargePercentagePointsPerHourColdFactor * (outside_temp < 0 ? outside_temp : 0)
+    const chargeHours = Math.ceil((charge_limit_soc - battery_level) / percentPointsPerHour)
 
     let tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)

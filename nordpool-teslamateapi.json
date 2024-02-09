@@ -32,7 +32,7 @@
         "y": 80,
         "wires": [
             [
-                "0cc902f1d835be41"
+                "9b37315731f16d91"
             ]
         ]
     },
@@ -41,7 +41,7 @@
         "type": "function",
         "z": "315d44a248a1f9b8",
         "name": "Calculate charge start based on Nordpool prices",
-        "func": "// Charge start window is the next full hour, for chargeWindowLength hours\nconst chargeWindowLength = 8\n\n// How many percentage points of charge the car gains in one hour\nconst chargePercentagePointsPerHour = 9\n\n// How many percentage points the charge rate drops below 0°C, per each °\nconst chargePercentagePointsPerHourColdFactor = 0.7\n\n// Nordpool market area\nconst nordpoolArea = \"FI\"\n\n// Name of the 'home' geolocation\nconst homeGeolocationName = \"Koti\"\n\ntry {\n    const nordpool = new Nordpool.Prices()\n\n    // 'Car Dashboards' saves the topics into global context in format [value, timestamp]\n    const geofence = global.get(\"geofence\")[0]\n    const battery_level = global.get(\"battery_level\")[0]\n    const charging_state = global.get(\"charging_state\")[0]\n    const charge_limit_soc = global.get(\"charge_limit_soc\")[0]\n    const outside_temp = global.get(\"outside_temp\")[0]\n\n    if (geofence != homeGeolocationName || charging_state != \"Stopped\") {\n        node.status({ text: `Not plugged in at home: ${geofence || \"-\"}/${charging_state || \"-\"}` })\n        return null\n    }\n\n    const percentPointsPerHour = chargePercentagePointsPerHour + chargePercentagePointsPerHourColdFactor * (outside_temp < 0 ? outside_temp : 0)\n    const chargeHours = Math.ceil((charge_limit_soc - battery_level) / percentPointsPerHour)\n\n    let tomorrow = new Date()\n    tomorrow.setDate(tomorrow.getDate() + 1)\n    tomorrow.setHours(0, 0, 0)\n\n    node.status({ text: \"Fetching Nordpool prices\" })\n\n    const todayPrices = await nordpool.hourly({ area: nordpoolArea })\n    const tomorrowPrices = await nordpool.hourly({ area: nordpoolArea, from: tomorrow })\n    const nordpoolPrices = Enumerable.from(todayPrices.concat(tomorrowPrices))\n\n    node.status({ text: \"Nordpool prices fetched\" })\n\n    // Charge start window is the next full hour\n    let chargeStartTime = new Date()\n    chargeStartTime.setHours(chargeStartTime.getHours() + 1)\n    chargeStartTime.setMinutes(0, 0, 0)\n\n    const pricesSinceElevenPM = nordpoolPrices.where(\n        i => new Date(i.date).getTime() >= chargeStartTime.getTime()\n    ).take(chargeWindowLength)\n    const hoursToConsider = pricesSinceElevenPM.take(pricesSinceElevenPM.count() - chargeHours)\n    let startHourPrices = []\n\n    hoursToConsider.toArray().forEach(\n        (price, index) =>\n            startHourPrices.push({ date: price.date, price: pricesSinceElevenPM.skip(index).take(chargeHours).sum(i => i.value) })\n    )\n\n    const cheapestStartHours = Enumerable.from(startHourPrices).orderBy(i => i.price)\n    const startTime = new Date(cheapestStartHours.first().date)\n    const startHour = new Date(cheapestStartHours.first().date).getHours()\n    const startDelay = startTime.getTime() - new Date().getTime() - 60 * 1000\n    node.status({ text: `Charge at: ${startHour.toString().padStart(2, '0')}:00 for ${chargeHours} hours` })\n\n    return [\n        {\n            \"delay\": startDelay.toString()\n        },\n        {\n            \"payload\": {\n                \"time\": startHour * 60,\n                \"enable\": \"true\"\n            }\n        }\n    ]\n} catch (e) {\n    node.warn(`Exception: ${e}`)\n\n    // defaults:\n    // * 4 minutes delay -> 22:59 if this executes at 22:55\n    // * 23:00 charge start time\n    return [\n        {\n            \"delay\": (4 * 60 * 1000).toString()\n        },\n        {\n            \"payload\": {\n                \"time\": 23 * 60,\n                \"enable\": \"true\"\n            }\n        }\n    ]\n}",
+        "func": "// Charging should be ready by this full hour, like 7:00 (24h, i.e. 7AM)\nconst chargeReadyHour = 7\n\n// How many percentage points of charge the car gains in one hour\nconst chargePercentagePointsPerHour = 9\n\n// How many percentage points the charge rate drops below 0°C, per each °\nconst chargePercentagePointsPerHourColdFactor = 0.07\n\n// Name of the 'home' geolocation\nconst homeGeolocationName = \"Koti\"\n\ntry {\n    // 'Car Dashboards' saves the topics into global context in format [value, timestamp]\n    const geofence = global.get(\"geofence\")[0]\n    const battery_level = global.get(\"battery_level\")[0]\n    const charging_state = global.get(\"charging_state\")[0]\n    const charge_limit_soc = global.get(\"charge_limit_soc\")[0]\n    const outside_temp = global.get(\"outside_temp\")[0]\n\n    node.warn(`Battery ${battery_level}%, state: ${charging_state}, limit: ${charge_limit_soc}%, temp: ${outside_temp}`)\n\n    if (geofence != homeGeolocationName || charging_state != \"Stopped\") {\n        node.status({ text: `Not plugged in at home: ${geofence || \"-\"}/${charging_state || \"-\"}` })\n        return null\n    }\n\n    const percentPointsPerHour = chargePercentagePointsPerHour + chargePercentagePointsPerHourColdFactor * (outside_temp < 0 ? outside_temp : 0)\n    const chargeHours = Math.ceil((charge_limit_soc - battery_level) / percentPointsPerHour)\n\n    let prices = []\n\n    msg.payload.forEach(pricePoint =>\n        prices.push(\n            {\n                date: new Date(pricePoint.DateTime),\n                value: pricePoint.PriceNoTax\n            }\n        )\n    )\n    const nordpoolPrices = Enumerable.from(prices)\n\n    // Charge window start is the next full hour\n    let chargeStartTime = new Date()\n    chargeStartTime.setHours(chargeStartTime.getHours() + 1)\n    chargeStartTime.setMinutes(0, 0, 0)\n\n    // Charge window end\n    let chargeEndTime = new Date()\n    if (chargeStartTime.getHours() >= chargeReadyHour) {\n        chargeEndTime.setDate(chargeEndTime.getDate() + 1)\n    }\n    chargeEndTime.setHours(chargeReadyHour, 0, 0, 0)\n\n    const pricesDuringChargeWindow = nordpoolPrices.where(\n        i => new Date(i.date).getTime() >= chargeStartTime.getTime()\n            && new Date(i.date).getTime() < chargeEndTime.getTime()\n    )\n\n    const hoursToConsider = pricesDuringChargeWindow.take(pricesDuringChargeWindow.count() - chargeHours)\n\n    let startHourPrices = []\n\n    hoursToConsider.toArray().forEach(\n        (price, index) =>\n            startHourPrices.push({ date: price.date, price: pricesDuringChargeWindow.skip(index).take(chargeHours).sum(i => i.value) })\n    )\n\n    const cheapestStartHours = Enumerable.from(startHourPrices).orderBy(i => i.price)\n    const startTime = new Date(cheapestStartHours.first().date)\n    const startHour = new Date(cheapestStartHours.first().date).getHours()\n    const startDelay = startTime.getTime() - new Date().getTime() - 60 * 1000\n    node.status({ text: `Charge at: ${startHour.toString().padStart(2, '0')}:00 for ${chargeHours} hours` })\n\n    return [\n        {\n            \"delay\": startDelay.toString()\n        },\n        {\n            \"payload\": {\n                \"time\": startHour * 60,\n                \"enable\": \"true\"\n            }\n        }\n    ]\n} catch (e) {\n    node.warn(`Exception: ${e}`)\n    node.status({ text: `Failure, charge at 23:00` })\n\n    // defaults:\n    // * 4 minutes delay -> 22:59 if this executes at 22:55\n    // * 23:00 charge start time\n    return [\n        {\n            \"delay\": (4 * 60 * 1000).toString()\n        },\n        {\n            \"payload\": {\n                \"time\": 23 * 60,\n                \"enable\": \"true\"\n            }\n        }\n    ]\n}",
         "outputs": 2,
         "timeout": 0,
         "noerr": 0,
@@ -57,8 +57,8 @@
                 "module": "nordpool"
             }
         ],
-        "x": 480,
-        "y": 80,
+        "x": 260,
+        "y": 160,
         "wires": [
             [
                 "6fdc375d860e060e"
@@ -86,8 +86,8 @@
         "drop": false,
         "allowrate": false,
         "outputs": 1,
-        "x": 810,
-        "y": 80,
+        "x": 590,
+        "y": 160,
         "wires": [
             [
                 "bbeed93578f5099c"
@@ -110,8 +110,8 @@
         "authType": "",
         "senderr": false,
         "headers": [],
-        "x": 1020,
-        "y": 80,
+        "x": 800,
+        "y": 160,
         "wires": [
             [
                 "f5a2bcb47d483676"
@@ -141,8 +141,8 @@
                 "valueValue": "application/json"
             }
         ],
-        "x": 810,
-        "y": 140,
+        "x": 590,
+        "y": 220,
         "wires": [
             [
                 "19c5c962102a6e62"
@@ -162,8 +162,8 @@
         "targetType": "msg",
         "statusVal": "$moment().tz('Europe/Helsinki').format('HH:mm:ss') & \": \" & msg.topic & \" = \" & msg.payload",
         "statusType": "jsonata",
-        "x": 1010,
-        "y": 140,
+        "x": 790,
+        "y": 220,
         "wires": []
     },
     {
@@ -179,8 +179,8 @@
         "targetType": "msg",
         "statusVal": "$moment().tz('Europe/Helsinki').format('HH:mm:ss') & \": \" & msg.topic & \" = \" & msg.payload",
         "statusType": "jsonata",
-        "x": 790,
-        "y": 200,
+        "x": 570,
+        "y": 280,
         "wires": []
     },
     {
@@ -196,8 +196,32 @@
         "targetType": "msg",
         "statusVal": "$moment().tz('Europe/Helsinki').format('HH:mm:ss') & \": \" & msg.delay",
         "statusType": "jsonata",
-        "x": 1210,
-        "y": 80,
+        "x": 990,
+        "y": 160,
         "wires": []
+    },
+    {
+        "id": "9b37315731f16d91",
+        "type": "http request",
+        "z": "315d44a248a1f9b8",
+        "name": "spot-hinta.fi TodayAndDayForward FI",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "https://api.spot-hinta.fi/TodayAndDayForward?region=FI",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 430,
+        "y": 80,
+        "wires": [
+            [
+                "0cc902f1d835be41"
+            ]
+        ]
     }
 ]

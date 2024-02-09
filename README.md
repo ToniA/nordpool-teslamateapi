@@ -1,7 +1,7 @@
 # Optimize Tesla charging on Nordpool spot prices, utilizing the TeslaMateAPI
 
 The objective is to optimize Tesla charging based on Nordpool spot electricity prices, incorporating the following features:
-   * The charging window is set between 23:00 and 07:00, spanning 8 hours
+   * The charging window starts at trigger time, the end time is configurable in code
    * The automation identifies the most cost-effective contiguous time period within the charging window
    * Charge duration is estimated based on the current battery level and ambient temperature (the battery heater is required below 0°C)
    * Charging is controlled using the scheduled charging feature
@@ -15,7 +15,8 @@ This is implemented as a Node-RED flow, built on
    * TeslaMate
    * TeslaMateAPI
    * Node-RED
-   * NPM packages ```nordpool``` and ```js-linq```
+   * Nordpool prices from https://spot-hinta.fi
+   * NPM package ```js-linq```
 
 ![The Node-RED flow](nordpool-teslamateapi.png)
 
@@ -79,7 +80,7 @@ volumes:
   node-red-data:
 ```
 
-The file ```add-nr-modules.sh```, add ```nordpool``` and ```js-linq```
+The file ```add-nr-modules.sh```, add ```js-linq```
 
 ```
 #!/bin/sh
@@ -90,7 +91,6 @@ node-red-dashboard
 node-red-node-email
 node-red-contrib-telegrambot
 node-red-node-ui-table
-nordpool
 js-linq"
 set -x
 for MODULE in $MODULES
@@ -104,9 +104,11 @@ docker compose start node-red
 ## The Node-RED flow
 
 Import the file ```nordpool-teslamateapi.json``` into Node-RED. This will create a new flow, with the nodes in the picture
-   * Edit the node 'Trigger at 22:55' to set the charge window start. The scheduled time should be 5 minutes before full hour
+   * Edit the node 'Trigger at 22:55' to set the charge window start. The scheduled time for the trigger should be ~5 minutes before full hour
    * Edit the node 'Schedule charge', and enter the ```API_TOKEN``` value into the 'Token' field
    * Edit the node 'Calculate charge start based on Nordpool prices' to set your preferences
+   * Edit the node 'spot-hinta.fi TodayAndDayForward FI' to set your Nordpool market area (in URL parameter), default is 'FI'
+      * See https://www.nordpoolgroup.com/en/maps/#/nordic
    * _The file ```nordpool-teslamateapi.js``` is just the source code of the 'Calculate charge start based on Nordpool prices' node_
 
 The purpose of the 'Resume logging' node is to enhance TeslaMate's accuracy in logging charges. The workflow involves scheduling a 'resume logging' action in TeslaMate one minute before the charge begins. This step is crucial as, without it, TeslaMate might miss capturing several minutes at the start of the charging process.
@@ -117,6 +119,6 @@ Plug in your car and schedule a charge to start in the future. I.e. the car shou
 
 Click on the blue button on the left side of the trigger node
    * If the car is not plugged in at home, in charge stopped state, the 'Calculate charge start based on Nordpool prices' node will show 'Not plugged in at home...' status
-   * If the car is ready to be scheduled, the node should first show 'Fetching Nordpool prices' status, and then the scheduled charge start time as status
+   * If the car is ready to be scheduled, the node should show the scheduled charge start time as status
    * Open the Tesla app, or check the charge schedule from the car. The car should be scheduled to charge at the time calculated by the automation
 

@@ -7,25 +7,25 @@ const chargePercentagePointsPerHour = 9
 // How many percentage points the charge rate drops below 0°C, per each °
 const chargePercentagePointsPerHourColdFactor = 0.07
 
-// Name of the 'home' geolocation
-const homeGeolocationName = "Koti"
-
 try {
     // 'Car Dashboards' saves the topics into global context in format [value, timestamp]
-    const geofence = global.get("geofence")[0]
     const battery_level = global.get("battery_level")[0]
     const charging_state = global.get("charging_state")[0]
     const charge_limit_soc = global.get("charge_limit_soc")[0]
     const outside_temp = global.get("outside_temp")[0]
+    const scheduled_charging_start_time = global.get("scheduled_charging_start_time")[0]
 
-    node.warn(`Battery ${battery_level}%, state: ${charging_state}, limit: ${charge_limit_soc}%, temp: ${outside_temp}`)
+    node.warn(`Battery ${battery_level}%, charge limit: ${charge_limit_soc}%`)
+    node.warn(`Charging state: ${charging_state}, outside temperature: ${outside_temp}`)
+    node.warn(`Charge scheduled at: ${scheduled_charging_start_time || "-"}`)
 
-    if (geofence != homeGeolocationName || charging_state != "Stopped") {
-        node.status({ text: `Not plugged in at home: ${geofence || "-"}/${charging_state || "-"}` })
+    if (scheduled_charging_start_time == "" || charging_state != "Stopped") {
+        node.status({ text: `Not plugged in with scheduled charge: ${charging_state || "-"}` })
         return null
     }
 
-    const percentPointsPerHour = chargePercentagePointsPerHour + chargePercentagePointsPerHourColdFactor * (outside_temp < 0 ? outside_temp : 0)
+    const percentPointsPerHour = chargePercentagePointsPerHour +
+        chargePercentagePointsPerHourColdFactor * (outside_temp < 0 ? outside_temp : 0)
     const chargeHours = Math.ceil((charge_limit_soc - battery_level) / percentPointsPerHour)
 
     let prices = []
@@ -57,7 +57,7 @@ try {
             && new Date(i.date).getTime() < chargeEndTime.getTime()
     )
 
-    const hoursToConsider = pricesDuringChargeWindow.take(pricesDuringChargeWindow.count() - chargeHours)
+    const hoursToConsider = pricesDuringChargeWindow.take(pricesDuringChargeWindow.count() - chargeHours + 1)
 
     let startHourPrices = []
 

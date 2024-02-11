@@ -7,9 +7,8 @@ The objective is to optimize Tesla charging based on Nordpool spot electricity p
    * Charging is controlled using the scheduled charging feature
    * In the event of a failure in determining the charge start time, 23:00 is used as a fallback
    * A charge is scheduled only if, at the time of execution, the car is:
-      * At home
       * Plugged in
-      * Not charging; in other words, it must be scheduled to start at the earliest at 23:00
+      * Scheduled to start charging, and not charging at the moment
 
 This is implemented as a Node-RED flow, built on
    * TeslaMate
@@ -25,8 +24,6 @@ This is implemented as a Node-RED flow, built on
 ## TeslaMate
 
 Obviously you need a working TeslaMate setup, running on Docker Compose. I run mine on Raspberry P 4.
-
-Set up a geofence for your home charger location.
 
 ## TeslaMateAPI
 
@@ -104,7 +101,7 @@ docker compose start node-red
 ## The Node-RED flow
 
 Import the file ```nordpool-teslamateapi.json``` into Node-RED. This will create a new flow, with the nodes in the picture
-   * Edit the node 'Trigger at 22:55' to set the charge window start. The scheduled time for the trigger should be ~5 minutes before full hour
+   * Edit the node 'Trigger at 22:55' to set the charge window start. The scheduled time for the trigger should be ~5 minutes before full hour of the earliest charge start time
    * Edit the node 'Schedule charge', and enter the ```API_TOKEN``` value into the 'Token' field
    * Edit the node 'Calculate charge start based on Nordpool prices' to set your preferences
    * Edit the node 'spot-hinta.fi TodayAndDayForward FI' to set your Nordpool market area (in URL parameter), default is 'FI'
@@ -118,7 +115,13 @@ The purpose of the 'Resume logging' node is to enhance TeslaMate's accuracy in l
 Plug in your car and schedule a charge to start in the future. I.e. the car should not be charging when the flow is tested.
 
 Click on the blue button on the left side of the trigger node
-   * If the car is not plugged in at home, in charge stopped state, the 'Calculate charge start based on Nordpool prices' node will show 'Not plugged in at home...' status
+   * If the car is not plugged in with scheduled charging, the 'Calculate charge start based on Nordpool prices' node will show 'Not plugged in with scheduled charge...' status
    * If the car is ready to be scheduled, the node should show the scheduled charge start time as status
    * Open the Tesla app, or check the charge schedule from the car. The car should be scheduled to charge at the time calculated by the automation
 
+# Changelog
+
+   * 2024-01-29 Initial version
+   * 2024-01-30 fix: chargePercentagePointsPerHourColdFactor was not used in charge time calculation
+   * 2024-02-09 Switch from nordpoolapi NPM package to spot-hinta.fi REST API, more flexible charge window, fix bug on cold weather charge time calculation
+   * 2024-02-11 Removed geolocation, instead the nordpool-optimized timing will work on any location which has scheduled charging. Fixed bug on charge window calculation (was one hour too short)

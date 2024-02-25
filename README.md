@@ -19,6 +19,13 @@ This is implemented as a Node-RED flow, built on
 
 ![The Node-RED flow](nordpool-teslamateapi.png)
 
+This graph shows the result of the optimization
+   * Green areas are the allowed charge windows
+   * Blue areas are the actual charges
+   * _On average, I charge every third or fourth night at home_
+
+![The charge window](chargewindow.png)
+
 # Setup
 
 ## TeslaMate

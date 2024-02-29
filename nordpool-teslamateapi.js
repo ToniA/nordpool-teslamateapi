@@ -1,11 +1,15 @@
 // Charging should be ready by this full hour, like 7:00 (24h, i.e. 7AM)
-const chargeReadyHour = 7
+// Array starting from Sunday. Example: ready by 07:00 on Mon-Fri, 08:00 on Sat-Sun
+const chargeReadyHour = [ 8, 7, 7, 7, 7, 7, 8 ]
 
 // How many percentage points of charge the car gains in one hour
 const chargePercentagePointsPerHour = 9
 
 // How many percentage points the charge rate drops below 0°C, per each °
 const chargePercentagePointsPerHourColdFactor = 0.07
+
+// On which hour to start charging if anything fails
+const fallbackChargeStartHour = 23
 
 try {
     // 'Car Dashboards' saves the topics into global context in format [value, timestamp]
@@ -47,10 +51,10 @@ try {
 
     // Charge window end
     let chargeEndTime = new Date()
-    if (chargeStartTime.getHours() >= chargeReadyHour) {
+    if (chargeStartTime.getHours() >= chargeReadyHour[chargeStartTime.getDay()]) {
         chargeEndTime.setDate(chargeEndTime.getDate() + 1)
     }
-    chargeEndTime.setHours(chargeReadyHour, 0, 0, 0)
+    chargeEndTime.setHours(chargeReadyHour[chargeEndTime.getDay()], 0, 0, 0)
 
     const pricesDuringChargeWindow = nordpoolPrices.where(
         i => new Date(i.date).getTime() >= chargeStartTime.getTime()
@@ -85,7 +89,7 @@ try {
     ]
 } catch (e) {
     node.warn(`Exception: ${e}`)
-    node.status({ text: `Failure, charge at 23:00` })
+    node.status({ text: `Failure, charge at ${fallbackChargeStartHour}:00` })
 
     // defaults:
     // * 4 minutes delay -> 22:59 if this executes at 22:55
@@ -96,7 +100,7 @@ try {
         },
         {
             "payload": {
-                "time": 23 * 60,
+                "time": fallbackChargeStartHour * 60,
                 "enable": "true"
             }
         }

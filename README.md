@@ -9,6 +9,7 @@ The objective is to optimize Tesla charging based on Nordpool spot electricity p
    * A charge is scheduled only if, at the time of execution, the car is:
       * Plugged in
       * Scheduled to start charging, and not charging at the moment
+   * It's possible to define several charging amps and their respective efficiences. The automation will attempt to use the lower charging amps alternative, if it's cheaper
 
 This is implemented as a Node-RED flow, built on
    * TeslaMate
@@ -133,3 +134,4 @@ Click on the blue button on the left side of the trigger node
    * 2024-02-09 Switch from nordpoolapi NPM package to spot-hinta.fi REST API, more flexible charge window, fix bug on cold weather charge time calculation
    * 2024-02-11 Removed geolocation, instead the nordpool-optimized timing will work on any location which has scheduled charging. Fixed bug on charge window calculation (was one hour too short)
    * 2024-02-29 chargeReadyHour configurable on weekday basis, fallbackChargeStartHour as configuration variable
+   * 2024-10-14 Possibility to define efficiencies for different charging amps. The calculation will determine whether it's cheaper to charge quickly with lower efficiency, or slower with higher efficiency

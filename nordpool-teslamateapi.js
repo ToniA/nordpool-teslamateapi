@@ -2,8 +2,22 @@
 // Array starting from Sunday. Example: ready by 07:00 on Mon-Fri, 08:00 on Sat-Sun
 const chargeReadyHour = [ 8, 7, 7, 7, 7, 7, 8 ]
 
+// Caruna grid fee + electricity tax + Vaasan Sähkö spot commission, €/kWh
+const basePrice =  0.0323 + 0.02827515 + 0.0041
+
 // How many percentage points of charge the car gains in one hour
-const chargePercentagePointsPerHour = 9
+const chargeSpeeds = [
+    {
+        amps: 10,
+        chargePercentagePointsPerHour: 9,
+        efficiency: 0.92
+    },
+    {
+        amps: 16,
+        chargePercentagePointsPerHour: 14,
+        efficiency: 0.85
+    }
+]
 
 // How many percentage points the charge rate drops below 0°C, per each °
 const chargePercentagePointsPerHourColdFactor = 0.07
@@ -28,21 +42,17 @@ try {
         return null
     }
 
-    const percentPointsPerHour = chargePercentagePointsPerHour +
-        chargePercentagePointsPerHourColdFactor * (outside_temp < 0 ? outside_temp : 0)
-    const chargeHours = Math.ceil((charge_limit_soc - battery_level) / percentPointsPerHour)
+    const chargeHourAlternatives = chargeSpeeds.map( obj => (
+        {...obj,
+            hours: Math.ceil((charge_limit_soc - battery_level) / (obj.chargePercentagePointsPerHour + chargePercentagePointsPerHourColdFactor * (outside_temp < 0 ? outside_temp : 0)))
+        }))
 
-    let prices = []
-
-    msg.payload.forEach(pricePoint =>
-        prices.push(
-            {
-                date: new Date(pricePoint.DateTime),
-                value: pricePoint.PriceNoTax
-            }
-        )
-    )
-    const nordpoolPrices = Enumerable.from(prices)
+    const nordpoolPrices = Enumerable.from(msg.payload.map(pricePoint => (
+        {
+            date: new Date(pricePoint.DateTime),
+            value: pricePoint.PriceWithTax
+        }
+    )))
 
     // Charge window start is the next full hour
     let chargeStartTime = new Date()
@@ -61,20 +71,37 @@ try {
             && new Date(i.date).getTime() < chargeEndTime.getTime()
     )
 
-    const hoursToConsider = pricesDuringChargeWindow.take(pricesDuringChargeWindow.count() - chargeHours + 1)
+    const cheapestStartHourAlternatives = chargeHourAlternatives.map( chargeHourAlternative => {
+        const hoursToConsider = pricesDuringChargeWindow.take(pricesDuringChargeWindow.count() - chargeHourAlternative.hours + 1).toArray()
 
-    let startHourPrices = []
+        const cheapestStartHour = Enumerable.from(hoursToConsider.map(
+            (price, index) => (
+                {
+                    date: price.date,
+                    price: pricesDuringChargeWindow.skip(index).take(chargeHourAlternative.hours).sum(i => (basePrice + i.value) / chargeHourAlternative.efficiency)
+                })
+        )).orderBy(i => i.price).first()
 
-    hoursToConsider.toArray().forEach(
-        (price, index) =>
-            startHourPrices.push({ date: price.date, price: pricesDuringChargeWindow.skip(index).take(chargeHours).sum(i => i.value) })
-    )
+        const startHour = new Date(cheapestStartHour.date).getHours()
 
-    const cheapestStartHours = Enumerable.from(startHourPrices).orderBy(i => i.price)
-    const startTime = new Date(cheapestStartHours.first().date)
-    const startHour = new Date(cheapestStartHours.first().date).getHours()
+        return {
+            startTime: cheapestStartHour.date,
+            startHour: startHour,
+            chargeHours: chargeHourAlternative.hours,
+            amps: chargeHourAlternative.amps,
+            price: chargeHourAlternative.hours * cheapestStartHour.price * 230 * chargeHourAlternative.amps / 1000
+        }
+    })
+
+    const cheapestStartHour = Enumerable.from(cheapestStartHourAlternatives).orderBy(i => i.price).first()
+
+    const startTime = cheapestStartHour.startTime
+    const startHour = cheapestStartHour.startHour
     const startDelay = startTime.getTime() - new Date().getTime() - 60 * 1000
-    node.status({ text: `Charge at: ${startHour.toString().padStart(2, '0')}:00 for ${chargeHours} hours` })
+    const chargeAmps = cheapestStartHour.amps
+    const price = cheapestStartHour.price.toFixed(2)
+
+    node.status({ text: `Charge at: ${startHour.toString().padStart(2, '0')}:00 for ${cheapestStartHour.chargeHours} hours at ${chargeAmps}A, estimate ${price}€` })
 
     return [
         {
@@ -85,6 +112,11 @@ try {
                 "time": startHour * 60,
                 "enable": "true"
             }
+        },
+        {
+            "payload": {
+                "charging_amps": chargeAmps
+            }
         }
     ]
 } catch (e) {
@@ -94,6 +126,7 @@ try {
     // defaults:
     // * 4 minutes delay -> 22:59 if this executes at 22:55
     // * 23:00 charge start time
+    // * 10A charging amps
     return [
         {
             "delay": (4 * 60 * 1000).toString()
@@ -102,6 +135,11 @@ try {
             "payload": {
                 "time": fallbackChargeStartHour * 60,
                 "enable": "true"
+            }
+        },
+        {
+            "payload": {
+                "charging_amps": 10
             }
         }
     ]

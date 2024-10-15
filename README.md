@@ -110,7 +110,7 @@ docker compose start node-red
 
 Import the file ```nordpool-teslamateapi.json``` into Node-RED. This will create a new flow, with the nodes in the picture
    * Edit the node 'Trigger at 22:55' to set the charge window start. The scheduled time for the trigger should be ~5 minutes before full hour of the earliest charge start time
-   * Edit the node 'Schedule charge', and enter the ```API_TOKEN``` value into the 'Token' field
+   * Edit the nodes 'Schedule charge' and 'Set charging amps', and enter the ```API_TOKEN``` value into the 'Token' field
    * Edit the node 'Calculate charge start based on Nordpool prices' to set your preferences
    * Edit the node 'spot-hinta.fi TodayAndDayForward FI' to set your Nordpool market area (in URL parameter), default is 'FI'
       * See https://www.nordpoolgroup.com/en/maps/#/nordic

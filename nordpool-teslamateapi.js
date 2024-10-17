@@ -89,7 +89,7 @@ try {
             startHour: startHour,
             chargeHours: chargeHourAlternative.hours,
             amps: chargeHourAlternative.amps,
-            price: chargeHourAlternative.hours * cheapestStartHour.price * 230 * chargeHourAlternative.amps / 1000
+            price: cheapestStartHour.price
         }
     })
 
@@ -99,7 +99,7 @@ try {
     const startHour = cheapestStartHour.startHour
     const startDelay = startTime.getTime() - new Date().getTime() - 60 * 1000
     const chargeAmps = cheapestStartHour.amps
-    const price = cheapestStartHour.price.toFixed(2)
+    const price = (cheapestStartHour.price * (230 * chargeAmps / 1000)).toFixed(2)
 
     node.status({ text: `Charge at: ${startHour.toString().padStart(2, '0')}:00 for ${cheapestStartHour.chargeHours} hours at ${chargeAmps}A, estimate ${price}€` })
 

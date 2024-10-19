@@ -5,6 +5,9 @@ const chargeReadyHour = [ 8, 7, 7, 7, 7, 7, 8 ]
 // Caruna grid fee + electricity tax + Vaasan Sähkö spot commission, €/kWh
 const basePrice =  0.0323 + 0.02827515 + 0.0041
 
+// 3-phase charge
+const chargePhases = 3
+
 // How many percentage points of charge the car gains in one hour
 const chargeSpeeds = [
     {
@@ -99,7 +102,7 @@ try {
     const startHour = cheapestStartHour.startHour
     const startDelay = startTime.getTime() - new Date().getTime() - 60 * 1000
     const chargeAmps = cheapestStartHour.amps
-    const price = (cheapestStartHour.price * (230 * chargeAmps / 1000)).toFixed(2)
+    const price = (cheapestStartHour.price * (230 * chargePhases * chargeAmps / 1000)).toFixed(2)
 
     node.status({ text: `Charge at: ${startHour.toString().padStart(2, '0')}:00 for ${cheapestStartHour.chargeHours} hours at ${chargeAmps}A, estimate ${price}€` })
 

@@ -47,7 +47,7 @@ try {
 
     const chargeHourAlternatives = chargeSpeeds.map( obj => (
         {...obj,
-            hours: Math.ceil((charge_limit_soc - battery_level) / (obj.chargePercentagePointsPerHour + chargePercentagePointsPerHourColdFactor * (outside_temp < 0 ? outside_temp : 0)))
+            hours: (charge_limit_soc - battery_level) / (obj.chargePercentagePointsPerHour + chargePercentagePointsPerHourColdFactor * (outside_temp < 0 ? outside_temp : 0))
         }))
 
     const nordpoolPrices = Enumerable.from(msg.payload.map(pricePoint => (
@@ -75,13 +75,13 @@ try {
     )
 
     const cheapestStartHourAlternatives = chargeHourAlternatives.map( chargeHourAlternative => {
-        const hoursToConsider = pricesDuringChargeWindow.take(pricesDuringChargeWindow.count() - chargeHourAlternative.hours + 1).toArray()
+        const hoursToConsider = pricesDuringChargeWindow.take(pricesDuringChargeWindow.count() - Math.ceil(chargeHourAlternative.hours + 1)).toArray()
 
         const cheapestStartHour = Enumerable.from(hoursToConsider.map(
             (price, index) => (
                 {
                     date: price.date,
-                    price: pricesDuringChargeWindow.skip(index).take(chargeHourAlternative.hours).sum(i => (basePrice + i.value) / chargeHourAlternative.efficiency)
+                    price: pricesDuringChargeWindow.skip(index).take(Math.ceil(chargeHourAlternative.hours)).sum(i => (basePrice + i.value) / chargeHourAlternative.efficiency * (230 * chargeHourAlternative.amps * chargePhases / 1000))
                 })
         )).orderBy(i => i.price).first()
 
@@ -90,7 +90,7 @@ try {
         return {
             startTime: cheapestStartHour.date,
             startHour: startHour,
-            chargeHours: chargeHourAlternative.hours,
+            chargeHours: chargeHourAlternative.hours.toFixed(1),
             amps: chargeHourAlternative.amps,
             price: cheapestStartHour.price
         }
@@ -102,7 +102,7 @@ try {
     const startHour = cheapestStartHour.startHour
     const startDelay = startTime.getTime() - new Date().getTime() - 60 * 1000
     const chargeAmps = cheapestStartHour.amps
-    const price = (cheapestStartHour.price * (230 * chargePhases * chargeAmps / 1000)).toFixed(2)
+    const price = cheapestStartHour.price.toFixed(2)
 
     node.status({ text: `Charge at: ${startHour.toString().padStart(2, '0')}:00 for ${cheapestStartHour.chargeHours} hours at ${chargeAmps}A, estimate ${price}€` })
 

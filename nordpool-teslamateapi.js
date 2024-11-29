@@ -71,11 +71,11 @@ try {
 
     const pricesDuringChargeWindow = nordpoolPrices.where(
         i => new Date(i.date).getTime() >= chargeStartTime.getTime()
-            && new Date(i.date).getTime() < chargeEndTime.getTime()
+            && new Date(i.date).getTime() <= chargeEndTime.getTime()
     )
 
     const cheapestStartHourAlternatives = chargeHourAlternatives.map( chargeHourAlternative => {
-        const hoursToConsider = pricesDuringChargeWindow.take(pricesDuringChargeWindow.count() - Math.ceil(chargeHourAlternative.hours + 1)).toArray()
+        const hoursToConsider = pricesDuringChargeWindow.take(pricesDuringChargeWindow.count() - Math.ceil(chargeHourAlternative.hours)).toArray()
 
         const cheapestStartHour = Enumerable.from(hoursToConsider.map(
             (price, index) => (

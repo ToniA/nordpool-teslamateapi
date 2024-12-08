@@ -40,7 +40,7 @@ try {
     node.warn(`Charging state: ${charging_state}, outside temperature: ${outside_temp}`)
     node.warn(`Charge scheduled at: ${scheduled_charging_start_time || "-"}`)
 
-    if (scheduled_charging_start_time == "" || charging_state != "Stopped") {
+    if (scheduled_charging_start_time == "" || !(charging_state == "Stopped" || charging_state == "NoPower")) {
         node.status({ text: `Not plugged in with scheduled charge: ${charging_state || "-"}` })
         return null
     }

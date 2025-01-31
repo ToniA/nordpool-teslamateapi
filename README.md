@@ -136,3 +136,4 @@ Click on the blue button on the left side of the trigger node
    * 2024-02-29 chargeReadyHour configurable on weekday basis, fallbackChargeStartHour as configuration variable
    * 2024-10-14 Possibility to define efficiencies for different charging amps. The calculation will determine whether it's cheaper to charge quickly with lower efficiency, or slower with higher efficiency
    * 2024-11-29 Fix charge timing calculation
+   * 2024-01-31 Fix charge window end calculation

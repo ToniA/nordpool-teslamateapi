@@ -63,11 +63,12 @@ try {
     chargeStartTime.setMinutes(0, 0, 0)
 
     // Charge window end
-    let chargeEndTime = new Date()
-    if (chargeStartTime.getHours() >= chargeReadyHour[chargeStartTime.getDay()]) {
+    let chargeEndTime = new Date(chargeStartTime)
+    chargeEndTime.setHours(chargeReadyHour[chargeEndTime.getDay()], 0, 0, 0)
+
+    if (chargeStartTime > chargeEndTime) {
         chargeEndTime.setDate(chargeEndTime.getDate() + 1)
     }
-    chargeEndTime.setHours(chargeReadyHour[chargeEndTime.getDay()], 0, 0, 0)
 
     const pricesDuringChargeWindow = nordpoolPrices.where(
         i => new Date(i.date).getTime() >= chargeStartTime.getTime()
